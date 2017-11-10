@@ -16,16 +16,23 @@
 #define LED1KI "Set LED 1 0" // LED1 kikapcsolásához tartozó üzenet.
 #define GETLED0 "Get LED 0" // LED0 lekérdezéséhez tartozó üzenet.
 #define GETLED1 "Get LED 1" // LED1 lekérdezéséhez tartozó üzenet.
+#define WRITETEXT "Write Text" // Kijelzõn futó szöveghez tartozó üzenet.
+#define WRITETEXT_LENGTH (10 + 1)
 
 // A PC-rõl UART-on érkezett üzenet.
-char message[100];
+char message[100 + 1];
 int messageSize = 0;
+char command[50 + 1];
 
 uint8_t /*volatile*/ ch;
 bool volatile new_char = false;
 
 // Változó egy új üzenet jelzésére. Az értéke true, ha új (még feldolgozatlan) üzenet érkezett.
 bool volatile receivedMessage = false;
+
+// Write Text parancshoz flag.
+// Értéke true, ha éppen futó szöveg fut a kijelzõn. Egyébként false az értéke.
+bool volatile writingText = false;
 
 void UART0_RX_IRQHandler(void) {
 	ch = USART_RxDataGet(UART0);
@@ -59,7 +66,6 @@ void string2USART(char * string)
 // Teljes üzenet kiírása a PC-s terminálra UART-on keresztül.
 void echoMessage()
 {
-	int i;
 	// Formátum: ÚJ SOR<ÜZENET>
 	USART_Tx(UART0, '\n');
 	string2USART("Echo:");
@@ -71,8 +77,6 @@ void echoMessage()
 
 int main(void)
 {
-	int i; // Sok iterációhoz kell.
-
 	// Chip errata
 	CHIP_Init();
 
@@ -122,7 +126,7 @@ int main(void)
 				string2USART(LED1BE); USART_Tx(UART0, '\n');
 				string2USART(LED1KI); USART_Tx(UART0, '\n');
 				string2USART(GETLED0); USART_Tx(UART0, '\n');
-				string2USART(GETLED1); USART_Tx(UART0, '\n');
+				string2USART(GETLED1);
 			}
 			else if(strcmp(message, LED0BE) == 0) // Ha az üzenet a LED0 bekapcsolása, akkor ...
 			{
@@ -150,8 +154,8 @@ int main(void)
 				}
 				else
 				{
-					string2USART("LED1 is dark");
-					SegmentLCD_Write("LED0 1");
+					string2USART("LED0 is dark");
+					SegmentLCD_Write("LED0 0");
 				}
 				SegmentLCD_Number(value);
 			}
@@ -165,15 +169,35 @@ int main(void)
 				}
 				else
 				{
-					string2USART("LED0 is dark");
+					string2USART("LED1 is dark");
 					SegmentLCD_Write("LED1 0");
 				}
 				SegmentLCD_Number(value);
 			}
 			else
 			{
-				string2USART("Invalid command. :-(");
-				SegmentLCD_Write("8-(");
+				if(strlen(message) > WRITETEXT_LENGTH)
+				{
+					int i;
+					int j;
+					// int length = strlen(message);
+					for(j = 0, i = WRITETEXT_LENGTH; message[i] != '\0'; i++, j++)
+					{
+						command[j] = message[i];
+					}
+					command[j] = '\0';
+					writingText = true;
+				}
+				else
+				{
+					string2USART("Invalid command. :-(");
+					SegmentLCD_Write("8-(");
+				}
+			}
+
+			if(writingText)
+			{
+				SegmentLCD_Write(command);
 			}
 
 			echoMessage();
