@@ -9,8 +9,13 @@
 #include <string.h>
 
 #define END_CHAR (13) // Üzenet vége ASCII karatker, hexában: 0x0013
-#define LED1BE "Set LED 1 1" // LED1 bekapcsolásához tartozó üzenet.
+#define HELP "Help" // Elérhetõ parancsok lekérdezéséhez tartozó üzenet.
+#define LED0BE "Set LED 0 1" // LED0 bekapcsolásához tartozó üzenet.
+#define LED0KI "Set LED 0 0" // LED0 kikapcsolásához tartozó üzenet.
+#define LED1BE "Set LED 1 1" // LED1 kikapcsolásához tartozó üzenet.
 #define LED1KI "Set LED 1 0" // LED1 kikapcsolásához tartozó üzenet.
+#define GETLED0 "Get LED 0" // LED0 lekérdezéséhez tartozó üzenet.
+#define GETLED1 "Get LED 1" // LED1 lekérdezéséhez tartozó üzenet.
 
 // A PC-rõl UART-on érkezett üzenet.
 char message[100];
@@ -29,7 +34,6 @@ void UART0_RX_IRQHandler(void) {
 	// Ha az érkezett karakter az üzenet vége jel, akkor vége egy üzenetnek és dolgozzuk fel (feldolgozás flag set)
 	if(ch == END_CHAR)
 	{
-		SegmentLCD_Write("msgEnd");
 		message[messageSize++] = '\0';
 		receivedMessage = true; // Flag beállítása, hogy a main-ben feldolgozzuk az üzenetet.
 	}
@@ -41,6 +45,28 @@ void UART0_RX_IRQHandler(void) {
 		messageSize++; // Jött egy új karakter, növeljük az üzenet hosszát jelentõ változót.
 	}
 	//USART_IntClear(UART0, USART_IF_RXDATAV);
+}
+
+void string2USART(char * string)
+{
+	int i;
+	for(i = 0; string[i] != '\0'; i++)
+	{
+			USART_Tx(UART0, string[i]);
+	}
+}
+
+// Teljes üzenet kiírása a PC-s terminálra UART-on keresztül.
+void echoMessage()
+{
+	int i;
+	// Formátum: ÚJ SOR<ÜZENET>
+	USART_Tx(UART0, '\n');
+	string2USART("Echo:");
+	USART_Tx(UART0, '<');
+	string2USART(message);
+	USART_Tx(UART0, '>');
+	USART_Tx(UART0, '\n');
 }
 
 int main(void)
@@ -61,8 +87,9 @@ int main(void)
 	USART_IntEnable(UART0, USART_IF_RXDATAV);
 	NVIC_EnableIRQ(UART0_RX_IRQn);
 
-	// Init board
-	GPIO_PinOutSet(LED0_PORT, LED0_PIN);
+	// Init LEDs
+	GPIO_PinOutClear(LED0_PORT, LED0_PIN);
+	GPIO_PinOutClear(LED1_PORT, LED1_PIN);
 	SegmentLCD_Init(false);
 
 	// Üdvözlõ üzenet a kijelzõn.
@@ -87,7 +114,25 @@ int main(void)
 			receivedMessage = false; // Feldolgozás után új üzenet várunk majd.
 
 			// Üzenetek feldolgozása:
-			if(strcmp(message, LED1BE) == 0) // Ha az üzenet a LED1 bekapcsolása, akkor ...
+			if(strcmp(message, HELP) == 0)
+			{
+				string2USART(HELP); USART_Tx(UART0, '\n');
+				string2USART(LED0BE); USART_Tx(UART0, '\n');
+				string2USART(LED0KI); USART_Tx(UART0, '\n');
+				string2USART(LED1BE); USART_Tx(UART0, '\n');
+				string2USART(LED1KI); USART_Tx(UART0, '\n');
+				string2USART(GETLED0); USART_Tx(UART0, '\n');
+				string2USART(GETLED1); USART_Tx(UART0, '\n');
+			}
+			else if(strcmp(message, LED0BE) == 0) // Ha az üzenet a LED0 bekapcsolása, akkor ...
+			{
+				GPIO_PinOutSet(LED0_PORT, LED0_PIN); // kapcsoljuk be a LED0-et.
+			}
+			else if(strcmp(message, LED0KI) == 0) // Ha az üzenet a LED0 kikapcsolása, akkor ...
+			{
+				GPIO_PinOutClear(LED0_PORT, LED0_PIN); // kapcsoljuk ki a LED0-et.
+			}
+			else if(strcmp(message, LED1BE) == 0) // Ha az üzenet a LED1 bekapcsolása, akkor ...
 			{
 				GPIO_PinOutSet(LED1_PORT, LED1_PIN); // kapcsoljuk be a LED1-et.
 			}
@@ -95,14 +140,45 @@ int main(void)
 			{
 				GPIO_PinOutClear(LED1_PORT, LED1_PIN); // kapcsoljuk ki a LED1-et.
 			}
-			SegmentLCD_Write("newMsg");
-			// Teljes üzenet kiírása a PC-s terminálra UART-on keresztül.
-			USART_Tx(UART0, '<');
-			for(i = 0; i < messageSize; i++)
+			else if(strcmp(message, GETLED0) == 0) // Ha az üzenet a LED0 lekérdezése, akkor ...
 			{
-				USART_Tx(UART0, message[i]);
+				int value = GPIO_PinOutGet(LED0_PORT, LED0_PIN); // kérdezzük le a LED0-et.
+				if(value == 1)
+				{
+					string2USART("LED0 is light");
+					SegmentLCD_Write("LED0 1");
+				}
+				else
+				{
+					string2USART("LED1 is dark");
+					SegmentLCD_Write("LED0 1");
+				}
+				SegmentLCD_Number(value);
 			}
-			USART_Tx(UART0, '>');
+			else if(strcmp(message, GETLED1) == 0) // Ha az üzenet a LED1 lekérdezése, akkor ...
+			{
+				int value = GPIO_PinOutGet(LED1_PORT, LED1_PIN); // kérdezzük le a LED1-et.
+				if(value == 1)
+				{
+					string2USART("LED1 is light");
+					SegmentLCD_Write("LED1 1");
+				}
+				else
+				{
+					string2USART("LED0 is dark");
+					SegmentLCD_Write("LED1 0");
+				}
+				SegmentLCD_Number(value);
+			}
+			else
+			{
+				string2USART("Invalid command. :-(");
+				SegmentLCD_Write("8-(");
+			}
+
+			echoMessage();
+
+			string2USART(">>");
 
 			// Üzenetet feldolgoztuk, "töröljük" az elõzõ üzenetet az új fogadása elõtt.
 			message[0] = '\0';
