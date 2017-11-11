@@ -26,6 +26,7 @@
     <property object="PORTIO" propertyId="portio.uart0.enable.rx" value="Enabled"/>
     <property object="PORTIO" propertyId="portio.uart0.enable.tx" value="Enabled"/>
     <property object="PORTIO" propertyId="portio.uart0.location.uart0" value="1"/>
+    <property object="TIMER0" propertyId="ABPeripheral.included" value="true"/>
     <property object="UART0" propertyId="ABPeripheral.included" value="true"/>
     <property object="USART0" propertyId="usart.synchronoussettings.databitsinframe" value="9"/>
   </mode>

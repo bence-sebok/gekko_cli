@@ -4,6 +4,8 @@
 #include "em_usart.h"
 #include "em_gpio.h"
 #include "em_emu.h"
+#include "em_cmu.h"
+#include "em_timer.h"
 #include "segmentlcd.h"
 #include <stdio.h>
 #include <string.h>
@@ -18,11 +20,13 @@
 #define GETLED1 "Get LED 1" // LED1 lekérdezéséhez tartozó üzenet.
 #define WRITETEXT "Write Text" // Kijelzõn futó szöveghez tartozó üzenet.
 #define WRITETEXT_LENGTH (10 + 1)
+#define KIJELZO_MERET (7)
 
 // A PC-rõl UART-on érkezett üzenet.
 char message[100 + 1];
 int messageSize = 0;
 char command[50 + 1];
+int step = 0;
 
 uint8_t /*volatile*/ ch;
 bool volatile new_char = false;
@@ -75,6 +79,13 @@ void echoMessage()
 	USART_Tx(UART0, '\n');
 }
 
+uint16_t ms_counter = 0;
+void TIMER0_IRQHandler(void)
+{
+  ms_counter++;                             // Increment counter
+  TIMER_IntClear(TIMER0, TIMER_IF_OF);      // Clear overflow flag
+}
+
 int main(void)
 {
 	// Chip errata
@@ -87,14 +98,36 @@ int main(void)
 	message[0] = '\0';
 	messageSize = 0;
 
+	/*
 	// Init device (additional settings, not available in Configurator)
 	USART_IntEnable(UART0, USART_IF_RXDATAV);
 	NVIC_EnableIRQ(UART0_RX_IRQn);
+	CMU_HFRCOBandSet(cmuHFRCOBand_14MHz);
 
 	// Init LEDs
 	GPIO_PinOutClear(LED0_PORT, LED0_PIN);
 	GPIO_PinOutClear(LED1_PORT, LED1_PIN);
 	SegmentLCD_Init(false);
+
+	// TIMER_IntClear(TIMER0, TIMER_IF_OF);
+	// TIMER_CounterSet(TIMER0, 0);
+	TIMER_TopSet(TIMER0, 1000);
+	TIMER_IntEnable(TIMER0, TIMER_IF_OF);
+	NVIC_EnableIRQ(TIMER0_IRQn);
+	*/
+
+	// Init device (additional settings, not available in Configurator)
+	// CMU_HFRCOBandSet(cmuHFRCOBand_1MHz);
+	USART_IntEnable(UART0, USART_IF_RXDATAV);
+	TIMER_IntEnable(TIMER0, TIMER_IF_OF);
+	NVIC_EnableIRQ(UART0_RX_IRQn);
+	NVIC_EnableIRQ(TIMER0_IRQn);
+	// Init board
+	GPIO_PinOutSet(LED0_PORT, LED0_PIN);
+	GPIO_PinOutSet(LED1_PORT, LED1_PIN);
+	SegmentLCD_Init(false);
+
+	TIMER_TopSet(TIMER0, 1000);
 
 	// Üdvözlõ üzenet a kijelzõn.
 	SegmentLCD_Write("CLI");
@@ -102,6 +135,7 @@ int main(void)
 	// Infinite loop
 	while (1)
 	{
+		SegmentLCD_Number(step);
 		EMU_EnterEM1();
 
 		if (new_char) {
@@ -116,6 +150,7 @@ int main(void)
 		if(receivedMessage)
 		{
 			receivedMessage = false; // Feldolgozás után új üzenet várunk majd.
+			writingText = false;
 
 			// Üzenetek feldolgozása:
 			if(strcmp(message, HELP) == 0)
@@ -186,6 +221,7 @@ int main(void)
 						command[j] = message[i];
 					}
 					command[j] = '\0';
+					string2USART(command);
 					writingText = true;
 				}
 				else
@@ -195,11 +231,6 @@ int main(void)
 				}
 			}
 
-			if(writingText)
-			{
-				SegmentLCD_Write(command);
-			}
-
 			echoMessage();
 
 			string2USART(">>");
@@ -207,6 +238,25 @@ int main(void)
 			// Üzenetet feldolgoztuk, "töröljük" az elõzõ üzenetet az új fogadása elõtt.
 			message[0] = '\0';
 			messageSize = 0;
+		}
+
+		if(writingText)
+		{
+			char screen[KIJELZO_MERET + 1];
+			memcpy(screen, command + step, KIJELZO_MERET);
+			screen[KIJELZO_MERET] = '\0';
+			SegmentLCD_Write(screen);
+		}
+
+		if(ms_counter >= 14000)
+		{
+			if (step >= (strlen(command) - KIJELZO_MERET))
+			{
+				step = -1;
+			}
+			step++;
+			ms_counter = 0;
+			GPIO_PinOutToggle(LED0_PORT, LED0_PIN);
 		}
 	}
 }
