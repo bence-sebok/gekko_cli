@@ -1,3 +1,4 @@
+// Gekkóhoz szükséges header fájlok
 #include "em_device.h"
 #include "em_chip.h"
 #include "InitDevice.h"
@@ -7,143 +8,40 @@
 #include "em_cmu.h"
 #include "em_timer.h"
 #include "segmentlcd.h"
+// C std header fájlok
 #include <stdio.h>
 #include <string.h>
+// saját header fájlok
+#include "constants.h" // Konstansok a projektben.
+#include "message.h" // Üzenetkezeléshez tartozó változók és függvények.
 
-#define END_CHAR (13) // Üzenet vége ASCII karatker, hexában: 0x0013
-#define HELP "Help" // Elérhetõ parancsok lekérdezéséhez tartozó üzenet.
-#define LED0BE "Set LED 0 1" // LED0 bekapcsolásához tartozó üzenet.
-#define LED0KI "Set LED 0 0" // LED0 kikapcsolásához tartozó üzenet.
-#define LED1BE "Set LED 1 1" // LED1 kikapcsolásához tartozó üzenet.
-#define LED1KI "Set LED 1 0" // LED1 kikapcsolásához tartozó üzenet.
-#define GETLED0 "Get LED 0" // LED0 lekérdezéséhez tartozó üzenet.
-#define GETLED1 "Get LED 1" // LED1 lekérdezéséhez tartozó üzenet.
-#define WRITETEXT "Write Text" // Kijelzõn futó szöveghez tartozó üzenet.
-#define WRITETEXT_LENGTH (10 + 1)
-#define KIJELZO_MERET (7)
-
-// A PC-rõl UART-on érkezett üzenet.
-char message[100 + 1];
-int messageSize = 0;
-char command[50 + 1];
-int step = 0;
-
-uint8_t /*volatile*/ ch;
-bool volatile new_char = false;
-
+/* *************
+  ÜZENETKEZELÉS
+************* */
+// A PC-rõl UART-on keresztül érkezett üzenet.
+extern char message[100 + 1]; // Üzenet tartalma.
+extern int messageSize; // Üzenet hossza.
+extern char command[50 + 1]; //
+extern int step; // Hányadik 7 darabos karaktersorozatot jelenítsük meg.
 // Változó egy új üzenet jelzésére. Az értéke true, ha új (még feldolgozatlan) üzenet érkezett.
-bool volatile receivedMessage = false;
-
-// Write Text parancshoz flag.
-// Értéke true, ha éppen futó szöveg fut a kijelzõn. Egyébként false az értéke.
-bool volatile writingText = false;
-
-void UART0_RX_IRQHandler(void) {
-	ch = USART_RxDataGet(UART0);
-	new_char = true;
-
-	// Ha az érkezett karakter az üzenet vége jel, akkor vége egy üzenetnek és dolgozzuk fel (feldolgozás flag set)
-	if(ch == END_CHAR)
-	{
-		message[messageSize++] = '\0';
-		receivedMessage = true; // Flag beállítása, hogy a main-ben feldolgozzuk az üzenetet.
-	}
-	// Ha még nem jött az üzenet vége jel, akkor tároljuk el az új karaktert az üzenetben.
-	else
-	{
-		// A messageSize változó mindig az új karakter indexelésére alkalmas.
-		message[messageSize] = ch;
-		messageSize++; // Jött egy új karakter, növeljük az üzenet hosszát jelentõ változót.
-	}
-	//USART_IntClear(UART0, USART_IF_RXDATAV);
-}
-
-void string2USART(char * string)
-{
-	int i;
-	for(i = 0; string[i] != '\0'; i++)
-	{
-			USART_Tx(UART0, string[i]);
-	}
-}
-
-// Teljes üzenet kiírása a PC-s terminálra UART-on keresztül.
-void echoMessage()
-{
-	// Formátum: ÚJ SOR<ÜZENET>
-	USART_Tx(UART0, '\n');
-	string2USART("Echo:");
-	USART_Tx(UART0, '<');
-	string2USART(message);
-	USART_Tx(UART0, '>');
-	USART_Tx(UART0, '\n');
-}
-
-uint16_t ms_counter = 0;
-void TIMER0_IRQHandler(void)
-{
-  ms_counter++;                             // Increment counter
-  TIMER_IntClear(TIMER0, TIMER_IF_OF);      // Clear overflow flag
-}
+extern bool volatile receivedMessage;
+// Write Text parancshoz flag. Értéke true, ha éppen futó szöveg fut a kijelzõn. Egyébként false az értéke.
+extern bool volatile writingText;
+extern uint8_t ch; // UART-on kapott karakter.
+extern bool volatile new_char; // Érkezett-e új karakter flag.
+extern uint16_t ms_counter; // Milliszekundumos iterációhoz.
+/* ********** */
 
 int main(void)
 {
-	// Chip errata
-	CHIP_Init();
+	Gekko_Init();
 
-	// Init device using Configurator
-	enter_DefaultMode_from_RESET();
-
-	// Üzenet változó alaphelyzetbe állítása: üres üzenet.
-	message[0] = '\0';
-	messageSize = 0;
-
-	/*
-	// Init device (additional settings, not available in Configurator)
-	USART_IntEnable(UART0, USART_IF_RXDATAV);
-	NVIC_EnableIRQ(UART0_RX_IRQn);
-	CMU_HFRCOBandSet(cmuHFRCOBand_14MHz);
-
-	// Init LEDs
-	GPIO_PinOutClear(LED0_PORT, LED0_PIN);
-	GPIO_PinOutClear(LED1_PORT, LED1_PIN);
-	SegmentLCD_Init(false);
-
-	// TIMER_IntClear(TIMER0, TIMER_IF_OF);
-	// TIMER_CounterSet(TIMER0, 0);
-	TIMER_TopSet(TIMER0, 1000);
-	TIMER_IntEnable(TIMER0, TIMER_IF_OF);
-	NVIC_EnableIRQ(TIMER0_IRQn);
-	*/
-
-	// Init device (additional settings, not available in Configurator)
-	// CMU_HFRCOBandSet(cmuHFRCOBand_1MHz);
-	USART_IntEnable(UART0, USART_IF_RXDATAV);
-	TIMER_IntEnable(TIMER0, TIMER_IF_OF);
-	NVIC_EnableIRQ(UART0_RX_IRQn);
-	NVIC_EnableIRQ(TIMER0_IRQn);
-	// Init board
-	GPIO_PinOutSet(LED0_PORT, LED0_PIN);
-	GPIO_PinOutSet(LED1_PORT, LED1_PIN);
-	SegmentLCD_Init(false);
-
-	TIMER_TopSet(TIMER0, 1000);
-
-	// Üdvözlõ üzenet a kijelzõn.
-	SegmentLCD_Write("CLI");
-
-	// Infinite loop
 	while (1)
 	{
-		SegmentLCD_Number(step);
-		EMU_EnterEM1();
-
 		if (new_char) {
 			new_char = false;
-			// USART_Tx(UART0, ch);
-			//GPIO_PinOutToggle(LED0_PORT, LED0_PIN);
-			//GPIO_PinOutToggle(LED1_PORT, LED1_PIN);
-			SegmentLCD_Number(ch);
+			USART_Tx(UART0, ch); // Karakterenkénti echo.
+			// DEBUG-oláshoz: SegmentLCD_Number(ch);
 		}
 
 		// Ha új üzennet érkezett, akkor dolgozzuk fel.
@@ -151,17 +49,12 @@ int main(void)
 		{
 			receivedMessage = false; // Feldolgozás után új üzenet várunk majd.
 			writingText = false;
+			SegmentLCD_AllOff();
 
 			// Üzenetek feldolgozása:
 			if(strcmp(message, HELP) == 0)
 			{
-				string2USART(HELP); USART_Tx(UART0, '\n');
-				string2USART(LED0BE); USART_Tx(UART0, '\n');
-				string2USART(LED0KI); USART_Tx(UART0, '\n');
-				string2USART(LED1BE); USART_Tx(UART0, '\n');
-				string2USART(LED1KI); USART_Tx(UART0, '\n');
-				string2USART(GETLED0); USART_Tx(UART0, '\n');
-				string2USART(GETLED1);
+				parancsok();
 			}
 			else if(strcmp(message, LED0BE) == 0) // Ha az üzenet a LED0 bekapcsolása, akkor ...
 			{
@@ -182,6 +75,7 @@ int main(void)
 			else if(strcmp(message, GETLED0) == 0) // Ha az üzenet a LED0 lekérdezése, akkor ...
 			{
 				int value = GPIO_PinOutGet(LED0_PORT, LED0_PIN); // kérdezzük le a LED0-et.
+				USART_Tx(UART0, '\n');
 				if(value == 1)
 				{
 					string2USART("LED0 is light");
@@ -197,6 +91,7 @@ int main(void)
 			else if(strcmp(message, GETLED1) == 0) // Ha az üzenet a LED1 lekérdezése, akkor ...
 			{
 				int value = GPIO_PinOutGet(LED1_PORT, LED1_PIN); // kérdezzük le a LED1-et.
+				USART_Tx(UART0, '\n');
 				if(value == 1)
 				{
 					string2USART("LED1 is light");
@@ -209,54 +104,73 @@ int main(void)
 				}
 				SegmentLCD_Number(value);
 			}
-			else
+			else // Invalid command vagy Write Text, ha a fentiek egyike se
 			{
+				// Write Text az üzenet?
 				if(strlen(message) > WRITETEXT_LENGTH)
 				{
 					int i;
 					int j;
-					// int length = strlen(message);
-					for(j = 0, i = WRITETEXT_LENGTH; message[i] != '\0'; i++, j++)
+					// Üzenet elejét bemásoljuk egy segédtömbbe.
+					for(j = 0, i = 0; i < (WRITETEXT_LENGTH-1); i++, j++)
 					{
 						command[j] = message[i];
 					}
 					command[j] = '\0';
-					string2USART(command);
-					writingText = true;
+					// Üzenet eleje megegyezik a WRITETEXT szöveggel?
+					if(strcmp(command, WRITETEXT) == 0)
+					{
+						// Ha igen, akkor Write Text parancs érkezett és üzenet kijelzése az LCD-re.
+						for(j = 0, i = WRITETEXT_LENGTH; message[i] != '\0'; i++, j++)
+						{
+							command[j] = message[i];
+						}
+						command[j] = '\0';
+						string2USART(command);
+						writingText = true;
+					}
 				}
+				// Ha nem, akkor Invalid command.
 				else
 				{
-					string2USART("Invalid command. :-(");
-					SegmentLCD_Write("8-(");
+					string2USART(INVALID);
+					SegmentLCD_Write("8-("); // Szomorú fej az LCD-re. :-(
+					// A ':' karakter nem szép az LCD-n, ezért napszemüveges szomorú fej: 8-(
 				}
 			}
-
-			echoMessage();
-
-			string2USART(">>");
-
 			// Üzenetet feldolgoztuk, "töröljük" az elõzõ üzenetet az új fogadása elõtt.
 			message[0] = '\0';
 			messageSize = 0;
+			// Terminál felkészítése a következõ parancsra:
+			USART_Tx(UART0, '\n');
+			string2USART(">>"); // Új prompt küldése.
 		}
 
+		// Ha éppen futószöveg van a kijelzõn.
 		if(writingText)
 		{
-			char screen[KIJELZO_MERET + 1];
-			memcpy(screen, command + step, KIJELZO_MERET);
-			screen[KIJELZO_MERET] = '\0';
+			// A kijelzendõ üzenetet 7 karakteres karaktersorozatokra bontjuk.
+			char screen[KIJELZO_MERET + 1]; // Ennek a tartalma kerül majd az LCD-re.
+			memcpy(screen, command + step, KIJELZO_MERET); // step-edik 7 darab karakter másolása az LCD-re.
+			screen[KIJELZO_MERET] = '\0'; // Lezárás a sztringgé alakítás miatt.
 			SegmentLCD_Write(screen);
 		}
 
+		// 1 másodperc letelt már?
+		// f = 14 MHz, vagyis T = 71.42 ns
+		// 1 másodperc = 1.4 * 10^7 ciklus várakozás.
 		if(ms_counter >= 14000)
 		{
+			// Elértük a szöveg végét?
 			if (step >= (strlen(command) - KIJELZO_MERET))
 			{
-				step = -1;
+				step = 0; // Kezdjük elõrõl.
 			}
-			step++;
-			ms_counter = 0;
-			GPIO_PinOutToggle(LED0_PORT, LED0_PIN);
+			else
+			{
+				step++; // Folytassuk a következõ 7 darab karakterrel.
+			}
+			ms_counter = 0; // Kezdjük elõrõl a számlálást.
 		}
 	}
 }

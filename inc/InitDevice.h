@@ -10,6 +10,7 @@
 
 // USER CONSTANTS
 // USER PROTOTYPES
+void Gekko_Init(void);
 
 // $[Mode Transition Prototypes]
 extern void enter_DefaultMode_from_RESET(void);
