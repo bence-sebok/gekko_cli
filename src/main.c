@@ -27,17 +27,19 @@ extern int step; // Hányadik 7 darabos karaktersorozatot jelenítsük meg.
 extern bool volatile receivedMessage;
 // Write Text parancshoz flag. Értéke true, ha éppen futó szöveg fut a kijelzõn. Egyébként false az értéke.
 extern bool volatile writingText;
+extern char screen[KIJELZO_MERET + 1]; // Ennek a tartalma kerül majd az LCD-re.
 extern uint8_t ch; // UART-on kapott karakter.
 extern bool volatile new_char; // Érkezett-e új karakter flag.
 extern uint16_t ms_counter; // Milliszekundumos iterációhoz.
 /* ********** */
-
+// ESP8266, Wemos D1, NodeMCU
 int main(void)
 {
 	Gekko_Init();
 
 	while (1)
 	{
+		// Érkezett karakter echo-ja.
 		if (new_char) {
 			new_char = false;
 			USART_Tx(UART0, ch); // Karakterenkénti echo.
@@ -78,12 +80,12 @@ int main(void)
 				USART_Tx(UART0, '\n');
 				if(value == 1)
 				{
-					string2USART("LED0 is light");
+					string2USART("LED0 vilagit");
 					SegmentLCD_Write("LED0 1");
 				}
 				else
 				{
-					string2USART("LED0 is dark");
+					string2USART("LED0 nem vilagit");
 					SegmentLCD_Write("LED0 0");
 				}
 				SegmentLCD_Number(value);
@@ -94,12 +96,12 @@ int main(void)
 				USART_Tx(UART0, '\n');
 				if(value == 1)
 				{
-					string2USART("LED1 is light");
+					string2USART("LED1 vilagit");
 					SegmentLCD_Write("LED1 1");
 				}
 				else
 				{
-					string2USART("LED1 is dark");
+					string2USART("LED1 nem vilagit");
 					SegmentLCD_Write("LED1 0");
 				}
 				SegmentLCD_Number(value);
@@ -126,8 +128,10 @@ int main(void)
 							command[j] = message[i];
 						}
 						command[j] = '\0';
+						USART_Tx(UART0, '\n');
 						string2USART(command);
 						writingText = true;
+						step = 0;
 					}
 				}
 				// Ha nem, akkor Invalid command.
@@ -150,10 +154,7 @@ int main(void)
 		if(writingText)
 		{
 			// A kijelzendõ üzenetet 7 karakteres karaktersorozatokra bontjuk.
-			char screen[KIJELZO_MERET + 1]; // Ennek a tartalma kerül majd az LCD-re.
-			memcpy(screen, command + step, KIJELZO_MERET); // step-edik 7 darab karakter másolása az LCD-re.
-			screen[KIJELZO_MERET] = '\0'; // Lezárás a sztringgé alakítás miatt.
-			SegmentLCD_Write(screen);
+			updateScreen(screen, command);
 		}
 
 		// 1 másodperc letelt már?

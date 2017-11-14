@@ -3,6 +3,8 @@
 #include "em_timer.h"
 #include "message.h" // Üzenetkezeléshez tartozó változók és függvények.
 #include "constants.h" // END_CHAR
+#include "segmentlcd.h"
+#include <stdlib.h>
 
 // A PC-rõl UART-on keresztül érkezett üzenet.
 char message[100 + 1] = ""; // Üzenet tartalma.
@@ -15,6 +17,7 @@ bool volatile receivedMessage = false;
 
 // Write Text parancshoz flag. Értéke true, ha éppen futó szöveg fut a kijelzõn. Egyébként false az értéke.
 bool volatile writingText = false;
+char screen[KIJELZO_MERET + 1]; // Ennek a tartalma kerül majd az LCD-re.
 
 uint8_t ch; // UART-on kapott karakter.
 bool volatile new_char = false; // Érkezett-e új karakter flag.
@@ -23,7 +26,7 @@ uint16_t ms_counter = 0; // Milliszekundumos iterációhoz.
 
 void TIMER0_IRQHandler(void)
 {
-  ms_counter++;                             // Increment counter
+  ms_counter++;                           // Increment counter
   TIMER_IntClear(TIMER0, TIMER_IF_OF);      // Clear overflow flag
 }
 
@@ -73,6 +76,7 @@ void parancsok(void)
 {
 	USART_Tx(UART0, '\n');
 	string2USART("Parancsok:"); USART_Tx(UART0, '\n');
+	string2USART(WRITETEXT); USART_Tx(UART0, '\n');
 	string2USART(HELP); USART_Tx(UART0, '\n');
 	string2USART(LED0BE); USART_Tx(UART0, '\n');
 	string2USART(LED0KI); USART_Tx(UART0, '\n');
@@ -80,4 +84,11 @@ void parancsok(void)
 	string2USART(LED1KI); USART_Tx(UART0, '\n');
 	string2USART(GETLED0); USART_Tx(UART0, '\n');
 	string2USART(GETLED1);
+}
+
+void updateScreen(char * screen, char * string)
+{
+	memcpy(screen, string + step, KIJELZO_MERET); // step-edik 7 darab karakter másolása az LCD-re.
+	screen[KIJELZO_MERET] = '\0'; // Lezárás a sztringgé alakítás miatt.
+	SegmentLCD_Write(screen);
 }

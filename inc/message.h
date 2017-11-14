@@ -6,5 +6,6 @@ void echoMessage();
 void UART0_RX_IRQHandler(void);
 void TIMER0_IRQHandler(void);
 void parancsok(void);
+void updateScreen(char * screen, char * string);
 
 #endif /* INC_MESSAGE_H_ */
