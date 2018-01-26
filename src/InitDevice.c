@@ -21,20 +21,28 @@ void Gekko_Init(void)
 {
 	CHIP_Init(); // Chip errata
 	enter_DefaultMode_from_RESET(); // Init device using Configurator
+
 	// Init device (additional settings, not available in Configurator)
+	/* UART0 */
 	USART_IntEnable(UART0, USART_IF_RXDATAV); // UART IT engedélyezés
-	NVIC_EnableIRQ(UART0_RX_IRQn);
-	TIMER_IntEnable(TIMER0, TIMER_IF_OF); // TIMER0 IT engedélyezés
-	NVIC_EnableIRQ(TIMER0_IRQn);
-	TIMER_TopSet(TIMER0, 1000);
-	// Init board: indításkor ne világítsanak a LED-ek.
-	GPIO_PinOutClear(LED0_PORT, LED0_PIN);
-	GPIO_PinOutClear(LED1_PORT, LED1_PIN);
-	// LCD kijelzõ
+	NVIC_EnableIRQ(UART0_RX_IRQn);            // UART IT engedélyezés
+	/* TIMER0 */
+	TIMER_IntEnable(TIMER0, TIMER_IF_OF);     // TIMER0 IT engedélyezés
+	NVIC_EnableIRQ(TIMER0_IRQn);              // TIMER0 IT engedélyezés
+	TIMER_TopSet(TIMER0, 1000);               // TIMER0 Top érték beállítása
+
+	/* Hardver inicializáció: LED-ek és LCD kijelzõ */
+	// LED-ek:
+	GPIO_PinOutClear(LED0_PORT, LED0_PIN); // LED0 ne világítson
+	GPIO_PinOutClear(LED1_PORT, LED1_PIN); // LED1 ne világítson
+	// LCD kijelzõ:
 	SegmentLCD_Init(false);
 	SegmentLCD_Write("CLI"); // Üdvözlõ üzenet a kijelzõn.
+	/* Szoftver inicializáció */
+	// Parancssori felület inicializációja (kezdõ karakterek kiküldése)
 	USART_Tx(UART0, '>');
 	USART_Tx(UART0, '>');
+
 	EMU_EnterEM1(); // Energiatakarékosság, mert nincs sok erõforrásigényes funkció.
 }
 

@@ -1,7 +1,9 @@
 #ifndef INC_CONSTANTS_H_
 #define INC_CONSTANTS_H_
 
-#define END_CHAR (13) // Üzenet vége ASCII karatker, hexában: 0x0013
+#define MESSAGE_MAX_SIZE (100 + 1) // UART-os üzenet maximális hossza lezáró nullával együtt.
+#define COMMAND_MAX_SIZE (50 + 1) // Parancs maximális hossza lezáró nullával együtt.
+#define END_CHAR (13) // Üzenet vége karatker, hexában: 0x0013
 #define INVALID "Invalid command. :-(" // Nem értelmezett üzenetre a válasz.
 #define HELP "Help" // Elérhetõ parancsok lekérdezéséhez tartozó üzenet.
 #define LED0BE "Set LED 0 1" // LED0 bekapcsolásához tartozó üzenet.
